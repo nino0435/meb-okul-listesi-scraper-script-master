@@ -1,0 +1,39 @@
+{
+  "name": "meb-tam-okul-listesi-scraper-script",
+  "version": "2.0.0",
+  "description": "Türkiye'deki tüm MEB okullarını il, ilçe ve okul türüyle birlikte çeken Puppeteer tabanlı scraper ve hazır JSON veri seti. A Puppeteer-based scraper and ready-to-use dataset of every K-12 school in Türkiye, sourced from the Ministry of National Education (MEB).",
+  "main": "script.js",
+  "scripts": {
+    "start": "node script.js",
+    "scrape": "node script.js"
+  },
+  "keywords": [
+    "meb",
+    "scraper",
+    "puppeteer",
+    "turkiye-okullari",
+    "turkey-schools",
+    "okul-listesi",
+    "open-data",
+    "education-data",
+    "k12",
+    "dataset",
+    "nodejs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nino0435/meb-tam-okul-listesi-scraper-script.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nino0435/meb-tam-okul-listesi-scraper-script/issues"
+  },
+  "homepage": "https://github.com/nino0435/meb-tam-okul-listesi-scraper-script#readme",
+  "author": "Berhan Tekdemir",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "puppeteer": "^24.0.0"
+  }
+}
