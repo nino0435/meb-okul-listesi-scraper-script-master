@@ -93,8 +93,8 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 ### Install & run
 
 ```bash
-git clone https://github.com/nino0435/meb-tam-okul-listesi-scraper-script.git
-cd meb-tam-okul-listesi-scraper-script
+git clone https://github.com/nino0435/meb-okul-listesi-scraper-script-master.git
+cd meb-okul-listesi-scraper-script-master
 npm install
 node script.js
 ```
@@ -124,7 +124,7 @@ A full run takes roughly **15–25 minutes** depending on your connection and ME
 If you only need the data, skip the scraper entirely:
 
 ```bash
-curl -L https://raw.githubusercontent.com/nino0435/meb-tam-okul-listesi-scraper-script/main/schools.json -o schools.json
+curl -L https://raw.githubusercontent.com/nino0435/meb-okul-listesi-scraper-script-master/main/schools.json -o schools.json
 ```
 
 Then load it like any JSON file:

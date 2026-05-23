@@ -15,7 +15,7 @@ cd "$(dirname "$0")"
 # Renkler
 G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'; N='\033[0m'
 
-REPO_NAME="meb-tam-okul-listesi-scraper-script"
+REPO_NAME="meb-okul-listesi-scraper-script-master"
 GITHUB_USER="nino0435"
 
 clear

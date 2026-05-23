@@ -93,8 +93,8 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 ### Kurulum ve çalıştırma
 
 ```bash
-git clone https://github.com/nino0435/meb-tam-okul-listesi-scraper-script.git
-cd meb-tam-okul-listesi-scraper-script
+git clone https://github.com/nino0435/meb-okul-listesi-scraper-script-master.git
+cd meb-okul-listesi-scraper-script-master
 npm install
 node script.js
 ```
@@ -124,7 +124,7 @@ Tam bir tarama; internetinize ve MEB sunucusunun durumuna göre **15–25 dakika
 Yalnızca veriyi istiyorsanız, kazıyıcıyı çalıştırmadan dosyayı doğrudan indirin:
 
 ```bash
-curl -L https://raw.githubusercontent.com/nino0435/meb-tam-okul-listesi-scraper-script/main/schools.json -o schools.json
+curl -L https://raw.githubusercontent.com/nino0435/meb-okul-listesi-scraper-script-master/main/schools.json -o schools.json
 ```
 
 Sonra istediğiniz dilde okuyun:
