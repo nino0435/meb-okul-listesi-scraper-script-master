@@ -18,13 +18,25 @@ const uniqueDistricts = new Set()
 
 // Okul ismine bakarak okul türünü tespit eden akıllı fonksiyon
 const detectSchoolType = (schoolName) => {
-  const name = schoolName.toLowerCase('tr-TR')
+  // DİKKAT: JS'in tek-argümanlı toLowerCase() locale argümanını YOK SAYAR (doğrusu
+  // toLocaleLowerCase('tr-TR') olurdu). Bu yüzden 'İ' (U+0130) standart Unicode
+  // kuralıyla 'i' + BİRLEŞTİRİCİ NOKTA (iki kod noktası) olur, düz 'i' değil — böylece
+  // "İlkokulu"/"İmam Hatip" gibi İ ile başlayan kelimeler .includes('ilkokulu') gibi
+  // düz-ASCII aramalarla hiç eşleşmiyordu (bulundu: 22.216 İlkokul "Diğer/Özel Eğitim"e,
+  // 1.736 İmam Hatip Lisesi düz "Lise"ye yanlış düşüyordu — veri setinin %40'ı). Önce
+  // İ/I'yı elle Türkçe karşılığına çevirip SONRA toLowerCase() çağırmak bunu çözüyor.
+  const name = schoolName.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase()
 
   if (name.includes('ilkokulu')) return 'İlkokul'
   if (name.includes('ortaokulu')) return 'Ortaokul'
   if (name.includes('fen lisesi')) return 'Fen Lisesi'
-  if (name.includes('anadolu lisesi')) return 'Anadolu Lisesi'
+  // 'mesleki ve teknik'/'mtal' kontrolü 'anadolu lisesi'den ÖNCE gelmeli: MTAL okul
+  // isimleri de "... Mesleki ve Teknik Anadolu Lisesi" biçiminde bittiği için, sıra
+  // ters olsaydı 'anadolu lisesi' alt-dizesi önce eşleşip TÜM MTAL'leri düz "Anadolu
+  // Lisesi" olarak yanlış etiketlerdi (bulundu: gerçek 3 MTAL örneğinin 3'ü de böyle
+  // yanlış sınıflanmıştı).
   if (name.includes('mesleki ve teknik') || name.includes('mtal')) return 'Mesleki ve Teknik Anadolu Lisesi'
+  if (name.includes('anadolu lisesi')) return 'Anadolu Lisesi'
   if (name.includes('imam hatip lisesi')) return 'Anadolu İmam Hatip Lisesi'
   if (name.includes('anaokulu')) return 'Anaokulu'
   if (name.includes('halk eğitimi')) return 'Halk Eğitimi Merkezi'
