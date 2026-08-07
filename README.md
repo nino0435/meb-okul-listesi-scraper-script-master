@@ -28,6 +28,8 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 
 > **Aug 2026 note:** MEB migrated the province page from a plain paginated HTML list to a server-side [DataTables](https://datatables.net/) table backed by `okullar_ajax.php`. Loading a province page directly (as any URL-based crawler does) now defaults that endpoint to district code `1` only — a client-side script fixes this by resetting the filter to "all districts" *after* the page loads, so a plain URL visit silently under-collects unless you drive that UI interaction. v2.1.0 fixes this by calling the same AJAX endpoint directly with the "all districts" parameter instead of scripting a browser; see [How It Works](#how-it-works).
 
+> **Classification fix note:** `detectSchoolType()` was mis-lowercasing the Turkish letter 'İ', because JS's single-argument `toLowerCase('tr-TR')` silently ignores its locale argument — so school names starting with 'İ' (`İlkokulu`, `İmam Hatip`, ...) never matched, and **40% of the dataset** (every elementary school) was silently mislabeled as "Diğer / Özel Eğitim". Vocational (MTAL) schools were also mislabeled as plain "Anadolu Lisesi" because their names end in "...Anadolu Lisesi" too. Both are now fixed; `type` is reliable again.
+
 ## Dataset at a Glance
 
 | Metric | Value |

@@ -28,6 +28,8 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 
 > **Ağustos 2026 notu:** MEB, il sayfasını düz sayfalanmış HTML listesinden `okullar_ajax.php` destekli sunucu-taraflı bir [DataTables](https://datatables.net/) tablosuna taşıdı. Bir il sayfasını doğrudan URL ile açmak (herhangi bir URL-tabanlı kazıyıcının yaptığı gibi) artık bu uç noktayı sadece 1 numaralı ilçeyle sınırlıyor — "tüm ilçeler" filtresi yalnızca sayfa yüklendikten SONRA bir istemci-taraflı script ile sıfırlanıyor, yani düz bir URL ziyareti bu arayüz etkileşimini tetiklemeden sessizce eksik veri toplar. v2.1.0 bunu, bir tarayıcı yönlendirmek yerine aynı AJAX uç noktasını "tüm ilçeler" parametresiyle doğrudan çağırarak çözer; bkz. [Nasıl Çalışıyor?](#nas%C4%B1l-%C3%A7al%C4%B1%C5%9F%C4%B1yor).
 
+> **Sınıflandırma düzeltmesi notu:** `detectSchoolType()`, JS'in tek-argümanlı `toLowerCase('tr-TR')`'sinin locale argümanını yok saydığı için 'İ' harfini yanlış küçültüyordu — bu yüzden "İlkokulu"/"İmam Hatip" gibi İ ile başlayan okul isimleri hiç eşleşmiyor, veri setinin **%40'ı** ("İlkokul"ların tamamı) yanlışlıkla "Diğer / Özel Eğitim"e düşüyordu. Ayrıca MTAL (meslek lisesi) okulları isimleri de "...Anadolu Lisesi" ile bittiği için düz "Anadolu Lisesi" olarak yanlış etiketleniyordu. İkisi de düzeltildi; `type` alanı artık güvenilir.
+
 ## Veri Seti Özeti
 
 | Metrik | Değer |
