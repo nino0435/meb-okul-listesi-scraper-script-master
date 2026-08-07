@@ -60,7 +60,8 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
       "name": "Akören Çok Programlı Anadolu Lisesi",
       "district": "ALADAĞ",
       "type": "Anadolu Lisesi",
-      "url": "https://aladagakorencokprogramlilisesi.meb.k12.tr/"
+      "url": "https://aladagakorencokprogramlilisesi.meb.k12.tr/",
+      "kurumKodu": "01/02/112770"
     }
   ],
   "ozet": {
@@ -79,6 +80,7 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 | `district` | string | Normalized district (`ilçe`), upper-case Turkish. |
 | `type` | string | Detected school category (see classifier below). |
 | `url` | string | Direct link to the school's `meb.k12.tr` page. |
+| `kurumKodu` | string \| null | MEB's official province/district/institution code (from the `YOL` field, format: `province/district/institution`) — a stable, unique identifier for the school. `null` if absent from the source. |
 
 ### School-type categories
 

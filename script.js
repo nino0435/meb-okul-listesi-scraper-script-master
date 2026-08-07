@@ -154,6 +154,7 @@ const fetchProvinceSchools = async (cityNo, cityName) => {
       district: districtName,
       type: detectSchoolType(schoolName),
       url: row.HOST ? `https://${row.HOST}.meb.k12.tr/` : null,
+      kurumKodu: row.YOL || null,
     })
   }
   return result

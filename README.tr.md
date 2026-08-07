@@ -60,7 +60,8 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
       "name": "Akören Çok Programlı Anadolu Lisesi",
       "district": "ALADAĞ",
       "type": "Anadolu Lisesi",
-      "url": "https://aladagakorencokprogramlilisesi.meb.k12.tr/"
+      "url": "https://aladagakorencokprogramlilisesi.meb.k12.tr/",
+      "kurumKodu": "01/02/112770"
     }
   ],
   "ozet": {
@@ -79,6 +80,7 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 | `district` | string | Normalize edilmiş ilçe (`ilçe`), Türkçe büyük harf. |
 | `type` | string | Tespit edilen okul kategorisi (aşağıdaki listeye bakın). |
 | `url` | string | Okulun `meb.k12.tr` adresine doğrudan bağlantı. |
+| `kurumKodu` | string \| null | MEB'in resmi il/ilçe/kurum kodu (`YOL` alanından, biçim: `il/ilçe/kurum`) — okulun kararlı, benzersiz kimliği. Kaynakta yoksa `null`. |
 
 ### Okul türü kategorileri
 
