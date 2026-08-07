@@ -7,7 +7,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Bağımlılık yok](https://img.shields.io/badge/ba%C4%9F%C4%B1ml%C4%B1l%C4%B1k-0-40B5A4)](./package.json)
 [![Lisans: MIT](https://img.shields.io/badge/Lisans-MIT-yellow.svg)](./LICENSE)
-[![Okul](https://img.shields.io/badge/Okul-54%2C923-blue)](#-veri-seti-%C3%B6zeti)
+[![Okul](https://img.shields.io/badge/Okul-55%2C062-blue)](#-veri-seti-%C3%B6zeti)
 [![İl](https://img.shields.io/badge/%C4%B0l-81%2F81-success)](#-veri-seti-%C3%B6zeti)
 [![İlçe](https://img.shields.io/badge/%C4%B0l%C3%A7e-973-informational)](#-veri-seti-%C3%B6zeti)
 [![Veri Seti](https://img.shields.io/badge/Veri%20Seti-Kullan%C4%B1ma%20Haz%C4%B1r-brightgreen)](./schools.json)
@@ -36,15 +36,19 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 | --- | --- |
 | İl | **81 / 81** |
 | İlçe | **973** (resmi sayıyla aynı) |
-| Okul | **54.923** |
-| Çıktı dosyası | `schools.json` (~9 MB) |
-| Kaynak | `https://www.meb.gov.tr/baglantilar/okullar` |
+| Okul | **55.062** |
+| Adres kapsamı | **%96,2** (52.957 okul) |
+| Telefon kapsamı | **%92,1** (50.709 okul) |
+| Faks kapsamı | **%16,3** (8.999 okul) |
+| Çıktı dosyası | `schools.json` (~20 MB iletişim bilgileriyle birlikte) |
+| Kaynak | `https://www.meb.gov.tr/baglantilar/okullar` + bireysel okul sayfaları |
 | Güncelleme | her çalıştırmada yeniden üretilir |
 
 ## Öne Çıkanlar
 
 - **Türkiye'nin tamamı.** `cities.json` üzerinden 81 ili tek tek dolaşır; her il için tüm ilçeleri (`ilce=0` = "tümü") TEK istekte çeker — sayfalama döngüsüne gerek yok.
 - **Bağımlılık yok, tarayıcı yok.** MEB'in kendi `okullar_ajax.php` uç noktasıyla Node'un yerleşik `fetch`'i üzerinden konuşur. Puppeteer yok, Chromium indirmesi yok, güncel tutulması gereken bir headless tarayıcı yok.
+- **İletişim bilgisi zenginleştirme.** `scrape_contact.js` her okulun `meb.k12.tr` ana sayfasını ziyaret eder (bulamazsa `/tema/iletisim.php`'ye fallback yapar), adres, telefon ve faks bilgisini iki tamamlayıcı stratejiyle çıkarır: metin etiket eşleştirmesi ve FontAwesome ikon sınıfı eşleştirmesi. 55.062 okulda %96 adres kapsamı sağlandı.
 - **İlçe normalizasyonu.** El ile derlenmiş bir yazım hatası sözlüğü ve büyükşehir kurallarıyla; MEB'in farklı sayfalarda farklı yazdığı ilçe isimleri tek bir kanonik isme indirgenir. Böylece veri setinde mükerrer ilçe oluşmaz.
 - **Okul türü sınıflandırıcı.** Anahtar kelime tabanlı sınıflandırıcı; her okulu MEB'in standart kategorilerinden birine eşler — İlkokul, Ortaokul, Anadolu Lisesi, Fen Lisesi, Anadolu İmam Hatip Lisesi, Mesleki ve Teknik Anadolu Lisesi, BİLSEM, Halk Eğitimi Merkezi, Öğretmenevi vb.
 - **Yeniden deneme + bekleme.** Her il için en fazla 4 deneme; hatalarda 6 sn bekleme; iller arasında nezaket molası. Kaynağı yormaz.
@@ -63,13 +67,16 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
       "district": "ALADAĞ",
       "type": "Anadolu Lisesi",
       "url": "https://aladagakorencokprogramlilisesi.meb.k12.tr/",
-      "kurumKodu": "01/02/112770"
+      "kurumKodu": "01/02/112770",
+      "adres": "AKÖREN MAHALLESİ CUMHURİYET CAD. NO 35, ALADAĞ/ADANA",
+      "telefon": "(322) 594 2007",
+      "faks": null
     }
   ],
   "ozet": {
     "toplam_il": 81,
     "toplam_ilce": 973,
-    "toplam_okul": 54923
+    "toplam_okul": 55062
   }
 }
 ```
@@ -83,6 +90,9 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 | `type` | string | Tespit edilen okul kategorisi (aşağıdaki listeye bakın). |
 | `url` | string | Okulun `meb.k12.tr` adresine doğrudan bağlantı. |
 | `kurumKodu` | string \| null | MEB'in resmi il/ilçe/kurum kodu (`YOL` alanından, biçim: `il/ilçe/kurum`) — okulun kararlı, benzersiz kimliği. Kaynakta yoksa `null`. |
+| `adres` | string \| null | Okulun MEB sayfasından çıkarılan açık adresi. Bulunamazsa veya yayımlanmamışsa `null`. |
+| `telefon` | string \| null | Telefon numarası. Bulunamazsa veya yalnızca yer tutucu varsa `null`. |
+| `faks` | string \| null | Faks numarası. Bulunamazsa veya yalnızca yer tutucu varsa `null`. |
 
 ### Okul türü kategorileri
 
@@ -96,7 +106,7 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 - Sabit bir internet bağlantısı
 - ~9 MB'lık çıktı dışında disk alanına gerek yok — kurulacak bir bağımlılık yok
 
-### Kurulum ve çalıştırma
+### Adım 1 — Okul listesini topla
 
 ```bash
 git clone https://github.com/nino0435/meb-okul-listesi-scraper-script-master.git
@@ -115,10 +125,30 @@ node script.js
 [🎉] BAŞARIYLA TAMAMLANDI!
     Toplam İl: 81
     Toplam İlçe: 973
-    Toplam Okul: 54923
+    Toplam Okul: 55062
 ```
 
-Tam bir tarama genellikle **2 dakikadan kısa** sürer (ölçüldü: 10 il ~7 saniyede) — açılacak bir tarayıcı yok, il başına sadece iki hafif HTTP isteği var.
+Tam bir tarama genellikle **2 dakikadan kısa** sürer — açılacak bir tarayıcı yok, il başına sadece iki hafif HTTP isteği var.
+
+### Adım 2 — İletişim bilgilerini zenginleştir (isteğe bağlı)
+
+```bash
+node scrape_contact.js
+```
+
+Bu komut, her okulun MEB web sayfasını ziyaret ederek adres, telefon ve faks bilgisini toplar; doğrudan `schools.json` dosyasına yazar. Her ilden sonra checkpoint kaydeder, kesintide `--resume` ile kaldığı yerden devam edebilirsiniz:
+
+```bash
+node scrape_contact.js --resume
+```
+
+İletişim taraması 55.062 okulu eş zamanlı (20'şer gruplar hâlinde) işler, bağlantı hızına göre **2-3 saat** sürer. Ağustos 2026 tam tarasının kapsama sonuçları:
+
+| Alan | Kapsama |
+| --- | --- |
+| Adres | **%96,2** (52.957 / 55.062) |
+| Telefon | **%92,1** (50.709 / 55.062) |
+| Faks | **%16,3** — çoğu okul artık faks numarası yayımlamıyor |
 
 ## Sadece Veri Setini Kullanmak
 
@@ -153,14 +183,16 @@ console.log(schools.ozet);
 
 ```
 .
-├── script.js          # Kazıyıcı
-├── cities.json        # 81 il ve MEB ILKODU değerleri
-├── schools.json       # Üretilen veri seti (depoda hazır)
-├── schools.partial.json  # Her ilden sonra yazılan checkpoint, başarıda silinir
+├── script.js               # Ana kazıyıcı (MEB dizininden okul listesi)
+├── scrape_contact.js        # İletişim bilgisi zenginleştirici (okul sayfalarından adres/telefon/faks)
+├── cities.json              # 81 il ve MEB ILKODU değerleri
+├── schools.json             # Üretilen veri seti (depoda hazır)
+├── schools.partial.json     # Her ilden sonra yazılan checkpoint, başarıda silinir
+├── contact_checkpoint.json  # İletişim tarayıcısı checkpoint dosyası, başarıda silinir
 ├── package.json
 ├── LICENSE
-├── README.md          # İngilizce
-└── README.tr.md       # Türkçe (bu dosya)
+├── README.md                # İngilizce
+└── README.tr.md             # Türkçe (bu dosya)
 ```
 
 ## Kullanım Senaryoları

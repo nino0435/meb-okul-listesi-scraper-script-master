@@ -7,7 +7,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Zero dependencies](https://img.shields.io/badge/dependencies-0-40B5A4)](./package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Schools](https://img.shields.io/badge/Schools-54%2C923-blue)](#-dataset-at-a-glance)
+[![Schools](https://img.shields.io/badge/Schools-55%2C062-blue)](#-dataset-at-a-glance)
 [![Provinces](https://img.shields.io/badge/Provinces-81%2F81-success)](#-dataset-at-a-glance)
 [![Districts](https://img.shields.io/badge/Districts-973-informational)](#-dataset-at-a-glance)
 [![Dataset](https://img.shields.io/badge/Dataset-Ready--to--use-brightgreen)](./schools.json)
@@ -20,7 +20,7 @@
 
 ## Overview
 
-This project queries the official MEB school directory at `meb.gov.tr/baglantilar/okullar` and turns its data into a single, machine-readable JSON file. Every record carries the school name, normalized district, classified school type, and direct URL.
+This project queries the official MEB school directory at `meb.gov.tr/baglantilar/okullar` and turns its data into a single, machine-readable JSON file. Every record carries the school name, normalized district, classified school type, direct URL, MEB institution code, and contact information (address, phone, fax).
 
 The scraper is built to survive the realities of the source site: name collisions between cities and districts, dozens of misspellings of district names (`DOĞUBEYAZIT` vs. `DOĞUBAYAZIT`, `ÇELTİKCİ` vs. `ÇELTİKÇİ`, …), and the Turkish-language `Elâzığ` vs. `Elazığ` accent variant that quietly breaks naive string matching. After normalization, the output exactly matches the official count of **81 provinces and 973 districts**.
 
@@ -36,19 +36,23 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 | --- | --- |
 | Provinces (`il`) | **81 / 81** |
 | Districts (`ilçe`) | **973** (matches official figure) |
-| Schools | **54,923** |
-| Output file | `schools.json` (~9 MB) |
-| Source | `https://www.meb.gov.tr/baglantilar/okullar` |
+| Schools | **55,062** |
+| Address coverage | **96.2%** (52,957 schools) |
+| Phone coverage | **92.1%** (50,709 schools) |
+| Fax coverage | **16.3%** (8,999 schools) |
+| Output file | `schools.json` (~20 MB with contact info) |
+| Source | `https://www.meb.gov.tr/baglantilar/okullar` + individual school pages |
 | Last refresh | regenerated on every run |
 
 ## Features
 
 - **Full-country coverage.** Iterates all 81 provinces from `cities.json` and fetches every district (`ilce=0` = "all") in a single request per province — no pagination loop needed.
 - **Zero dependencies, no browser.** Talks to MEB's own `okullar_ajax.php` endpoint with Node's built-in `fetch`. No Puppeteer, no Chromium download, no headless browser to keep up to date.
+- **Contact info enrichment.** `scrape_contact.js` visits each school's `meb.k12.tr` homepage (and falls back to `/tema/iletisim.php`) to extract address, phone, and fax using two complementary strategies: text-label matching and FontAwesome icon class matching. Achieved 96% address coverage across all 55,062 schools.
 - **District normalization.** A curated typo map plus rules for metropolitan municipalities (`büyükşehir`) collapses MEB's inconsistent spellings into a single canonical district name, so duplicates do not appear in the dataset.
 - **School-type classifier.** A keyword classifier maps each school name to one of the standard MEB categories — İlkokul, Ortaokul, Anadolu Lisesi, Fen Lisesi, Anadolu İmam Hatip Lisesi, Mesleki ve Teknik Anadolu Lisesi, BİLSEM, Halk Eğitimi Merkezi, Öğretmenevi, and more.
 - **Retry with backoff.** Up to four attempts per province with a 6-second wait between failures; a cool-down between provinces to avoid hammering the source.
-- **Checkpointing.** Writes `schools.partial.json` after every province, so a crash or network drop mid-run doesn't lose already-collected provinces.
+- **Checkpointing.** Writes checkpoint files after every province, so a crash or network drop mid-run doesn't lose already-collected provinces.
 - **Self-verifying output.** Compares the final `ozet` totals against the expected province/district/school counts and prints a warning if they deviate by more than 15% — the exact kind of silent under-collection that motivated the Aug 2026 fix now gets caught automatically instead of shipping unnoticed.
 
 ## Output Schema
@@ -63,13 +67,16 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
       "district": "ALADAĞ",
       "type": "Anadolu Lisesi",
       "url": "https://aladagakorencokprogramlilisesi.meb.k12.tr/",
-      "kurumKodu": "01/02/112770"
+      "kurumKodu": "01/02/112770",
+      "adres": "AKÖREN MAHALLESİ CUMHURİYET CAD. NO 35, ALADAĞ/ADANA",
+      "telefon": "(322) 594 2007",
+      "faks": null
     }
   ],
   "ozet": {
     "toplam_il": 81,
     "toplam_ilce": 973,
-    "toplam_okul": 54923
+    "toplam_okul": 55062
   }
 }
 ```
@@ -83,6 +90,9 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 | `type` | string | Detected school category (see classifier below). |
 | `url` | string | Direct link to the school's `meb.k12.tr` page. |
 | `kurumKodu` | string \| null | MEB's official province/district/institution code (from the `YOL` field, format: `province/district/institution`) — a stable, unique identifier for the school. `null` if absent from the source. |
+| `adres` | string \| null | Street address extracted from the school's MEB webpage. `null` if not found or not published. |
+| `telefon` | string \| null | Phone number. `null` if not found or placeholder-only. |
+| `faks` | string \| null | Fax number. `null` if not found or placeholder-only. |
 
 ### School-type categories
 
@@ -94,9 +104,9 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 
 - Node.js **18 or newer** (for the built-in `fetch`)
 - A stable internet connection
-- No disk space beyond the ~9 MB output — there are no dependencies to install
+- No disk space beyond the ~20 MB output — there are no dependencies to install
 
-### Install & run
+### Step 1 — Collect school list
 
 ```bash
 git clone https://github.com/nino0435/meb-okul-listesi-scraper-script-master.git
@@ -115,10 +125,30 @@ While running, the script logs progress per province:
 [🎉] BAŞARIYLA TAMAMLANDI!
     Toplam İl: 81
     Toplam İlçe: 973
-    Toplam Okul: 54923
+    Toplam Okul: 55062
 ```
 
-A full run typically finishes in **under 2 minutes** (measured: 10 provinces in ~7 seconds) — no browser to launch, just two lightweight HTTP requests per province.
+A full run typically finishes in **under 2 minutes** — no browser to launch, just two lightweight HTTP requests per province.
+
+### Step 2 — Enrich with contact information (optional)
+
+```bash
+node scrape_contact.js
+```
+
+This visits each school's MEB webpage to collect address, phone, and fax. It writes the contact fields directly into `schools.json` and saves a checkpoint after each province so you can resume with `--resume` if interrupted:
+
+```bash
+node scrape_contact.js --resume
+```
+
+The contact scrape processes all 55,062 schools concurrently (20 at a time) and finishes in **2–3 hours** depending on connection speed. Coverage from the Aug 2026 full run:
+
+| Field | Coverage |
+| --- | --- |
+| Address | **96.2%** (52,957 / 55,062) |
+| Phone | **92.1%** (50,709 / 55,062) |
+| Fax | **16.3%** — most schools no longer publish a fax number |
 
 ## Using the Dataset Without Running the Scraper
 
@@ -153,14 +183,16 @@ console.log(schools.ozet);
 
 ```
 .
-├── script.js          # The scraper
-├── cities.json        # 81 provinces with their MEB ILKODU values
-├── schools.json       # Generated dataset (committed for convenience)
-├── schools.partial.json  # Checkpoint written after each province, deleted on success
+├── script.js              # The main scraper (school list from MEB directory)
+├── scrape_contact.js      # Contact info enrichment (address/phone/fax from school pages)
+├── cities.json            # 81 provinces with their MEB ILKODU values
+├── schools.json           # Generated dataset (committed for convenience)
+├── schools.partial.json   # Checkpoint written after each province, deleted on success
+├── contact_checkpoint.json  # Contact scraper checkpoint (deleted on success)
 ├── package.json
 ├── LICENSE
-├── README.md          # English (this file)
-└── README.tr.md       # Turkish
+├── README.md              # English (this file)
+└── README.tr.md           # Turkish
 ```
 
 ## Use Cases
@@ -170,10 +202,11 @@ console.log(schools.ozet);
 - Power dropdowns in government / NGO forms that need an authoritative school list.
 - Train or evaluate NLP models on Turkish proper-noun normalization.
 - Generate static maps of school density across Türkiye.
+- Enrich school records with verified contact information for parent/community apps.
 
 ## Disclaimer & Ethics
 
-This scraper is intended for educational, research, and open-data purposes. The underlying data is published by MEB on a public website. The script makes exactly two lightweight requests per province, throttles itself with a cool-down between provinces, respects timeouts, and retries gracefully — please keep these protections in place if you fork it. If you redistribute the dataset, attribute MEB as the original source.
+This scraper is intended for educational, research, and open-data purposes. The underlying data is published by MEB on a public website. The main scraper makes exactly two lightweight requests per province; the contact scraper fetches each school's public homepage with a 6-second timeout and a concurrency cap of 20 — please keep these protections in place if you fork it. If you redistribute the dataset, attribute MEB as the original source.
 
 ## Contributing
 
