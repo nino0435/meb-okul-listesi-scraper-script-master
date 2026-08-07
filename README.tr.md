@@ -2,10 +2,10 @@
 
 # MEB Tam Okul Listesi — Kazıyıcı & Açık Veri Seti
 
-**Türkiye'deki tüm MEB okullarını doğrudan resmi kaynaktan çekip tek bir düzgün JSON dosyasına dönüştüren Puppeteer tabanlı bir kazıyıcı (scraper).**
+**Türkiye'deki tüm MEB okullarını doğrudan resmi kaynaktan çekip tek bir düzgün JSON dosyasına dönüştüren, hafif (tarayıcısız) bir kazıyıcı (scraper).**
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Puppeteer](https://img.shields.io/badge/Puppeteer-24.x-40B5A4?logo=puppeteer&logoColor=white)](https://pptr.dev/)
+[![Bağımlılık yok](https://img.shields.io/badge/ba%C4%9F%C4%B1ml%C4%B1l%C4%B1k-0-40B5A4)](./package.json)
 [![Lisans: MIT](https://img.shields.io/badge/Lisans-MIT-yellow.svg)](./LICENSE)
 [![Okul](https://img.shields.io/badge/Okul-54%2C923-blue)](#-veri-seti-%C3%B6zeti)
 [![İl](https://img.shields.io/badge/%C4%B0l-81%2F81-success)](#-veri-seti-%C3%B6zeti)
@@ -22,9 +22,11 @@
 
 Bu proje, MEB'in resmi `meb.gov.tr/baglantilar/okullar` adresindeki sayfa sayfa dağılmış, tutarsız biçimlenmiş okul listesini tek tıkla işlenebilir bir JSON dosyasına dönüştürür. Her kayıtta okul adı, normalize edilmiş ilçe bilgisi, sınıflandırılmış okul türü ve okulun doğrudan web sitesi yer alır.
 
-Kaynaktaki gerçek dünya sorunlarına karşı tasarlandı: sessizce tekrarlanan sayfalar, il-ilçe isim çakışmaları, MEB sayfalarında onlarca farklı şekilde yazılan ilçe isimleri (`DOĞUBEYAZIT` ↔ `DOĞUBAYAZIT`, `ÇELTİKCİ` ↔ `ÇELTİKÇİ` gibi), ve basit string karşılaştırmasını çöküşe sürükleyen `Elâzığ` ↔ `Elazığ` aksan farkı. Normalizasyon sonrasında çıktı; resmi sayım olan **81 il ve 973 ilçeye birebir** oturur.
+Kaynaktaki gerçek dünya sorunlarına karşı tasarlandı: il-ilçe isim çakışmaları, MEB sayfalarında onlarca farklı şekilde yazılan ilçe isimleri (`DOĞUBEYAZIT` ↔ `DOĞUBAYAZIT`, `ÇELTİKCİ` ↔ `ÇELTİKÇİ` gibi), ve basit string karşılaştırmasını çöküşe sürükleyen `Elâzığ` ↔ `Elazığ` aksan farkı. Normalizasyon sonrasında çıktı; resmi sayım olan **81 il ve 973 ilçeye birebir** oturur.
 
 Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihazırda depoda yer alır — statik bir veri seti olarak doğrudan kullanabilirsiniz.
+
+> **Ağustos 2026 notu:** MEB, il sayfasını düz sayfalanmış HTML listesinden `okullar_ajax.php` destekli sunucu-taraflı bir [DataTables](https://datatables.net/) tablosuna taşıdı. Bir il sayfasını doğrudan URL ile açmak (herhangi bir URL-tabanlı kazıyıcının yaptığı gibi) artık bu uç noktayı sadece 1 numaralı ilçeyle sınırlıyor — "tüm ilçeler" filtresi yalnızca sayfa yüklendikten SONRA bir istemci-taraflı script ile sıfırlanıyor, yani düz bir URL ziyareti bu arayüz etkileşimini tetiklemeden sessizce eksik veri toplar. v2.1.0 bunu, bir tarayıcı yönlendirmek yerine aynı AJAX uç noktasını "tüm ilçeler" parametresiyle doğrudan çağırarak çözer; bkz. [Nasıl Çalışıyor?](#nas%C4%B1l-%C3%A7al%C4%B1%C5%9F%C4%B1yor).
 
 ## Veri Seti Özeti
 
@@ -39,13 +41,13 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 
 ## Öne Çıkanlar
 
-- **Türkiye'nin tamamı.** `cities.json` üzerinden 81 ili tek tek dolaşır, sayfalama sonuna kadar tüm sayfaları yürür.
+- **Türkiye'nin tamamı.** `cities.json` üzerinden 81 ili tek tek dolaşır; her il için tüm ilçeleri (`ilce=0` = "tümü") TEK istekte çeker — sayfalama döngüsüne gerek yok.
+- **Bağımlılık yok, tarayıcı yok.** MEB'in kendi `okullar_ajax.php` uç noktasıyla Node'un yerleşik `fetch`'i üzerinden konuşur. Puppeteer yok, Chromium indirmesi yok, güncel tutulması gereken bir headless tarayıcı yok.
 - **İlçe normalizasyonu.** El ile derlenmiş bir yazım hatası sözlüğü ve büyükşehir kurallarıyla; MEB'in farklı sayfalarda farklı yazdığı ilçe isimleri tek bir kanonik isme indirgenir. Böylece veri setinde mükerrer ilçe oluşmaz.
 - **Okul türü sınıflandırıcı.** Anahtar kelime tabanlı sınıflandırıcı; her okulu MEB'in standart kategorilerinden birine eşler — İlkokul, Ortaokul, Anadolu Lisesi, Fen Lisesi, Anadolu İmam Hatip Lisesi, Mesleki ve Teknik Anadolu Lisesi, BİLSEM, Halk Eğitimi Merkezi, Öğretmenevi vb.
-- **Akıllı sayfa geçişi.** "Sonraki sayfa" düğmesini metin üzerinden bulur (`>`, `»`, `Sonraki`, sayfa numarası) ve sayfanın **gerçekten değiştiğini** doğrulamadan ilerlemez. MEB'in aynı sayfayı sessizce tekrar sunması durumunda sonsuz döngüye girmez.
-- **Yeniden deneme + bekleme.** Her il için en fazla 4 deneme; hatalarda 6 sn bekleme; iller arasında 1 sn'lik nezaket molası. Kaynağı yormaz.
-- **Aksanlara duyarlı eşleştirme.** `â/î/û` harfleri sadeleştirilir, Türkçe locale ile küçük harfe çevrilir. Böylece DOM filtrelemesinde `Elâzığ` gibi iller doğru yakalanır.
-- **Kendiliğinden özet.** Çıktıya, toplam il/ilçe/okul sayılarını barındıran bir `ozet` bloğu eklenir.
+- **Yeniden deneme + bekleme.** Her il için en fazla 4 deneme; hatalarda 6 sn bekleme; iller arasında nezaket molası. Kaynağı yormaz.
+- **Checkpoint.** Her ilden sonra `schools.partial.json` yazılır — çalışma ortasında çökme/bağlantı kopması olsa bile o ana kadar toplanan iller kaybolmaz.
+- **Kendi kendini doğrulama.** Sonuçtaki `ozet` toplamları, beklenen il/ilçe/okul sayılarıyla karşılaştırılır; %15'ten fazla sapma varsa uyarı basılır — Ağustos 2026'daki sessiz eksik-veri sorununu bir daha fark edilmeden geçmesin diye bu kontrol artık otomatik.
 
 ## Çıktı Şeması
 
@@ -86,24 +88,19 @@ Kodları çalıştırmayı düşünmüyorsanız `schools.json` dosyası halihaz�
 
 ### Gereksinimler
 
-- Node.js **18 veya üstü**
-- ~250 MB boş disk alanı (Puppeteer kendi Chromium'unu indirir)
+- Node.js **18 veya üstü** (yerleşik `fetch` için)
 - Sabit bir internet bağlantısı
+- ~9 MB'lık çıktı dışında disk alanına gerek yok — kurulacak bir bağımlılık yok
 
 ### Kurulum ve çalıştırma
 
 ```bash
 git clone https://github.com/nino0435/meb-okul-listesi-scraper-script-master.git
 cd meb-okul-listesi-scraper-script-master
-npm install
 node script.js
 ```
 
-Apple Silicon (M1/M2/M3) Mac kullanıyorsanız ve Puppeteer uyumlu bir Chromium indiremiyorsa, en güncel sürümü yükleyin:
-
-```bash
-npm install puppeteer@latest
-```
+(`npm install` hiçbir şey yapmaz — projenin çalışma zamanı bağımlılığı yok — ama isterseniz yine de çalıştırmanız güvenlidir.)
 
 Çalışma sırasında her il için ilerleme yazdırılır:
 
@@ -117,7 +114,7 @@ npm install puppeteer@latest
     Toplam Okul: 54923
 ```
 
-Tam bir tarama; internetinize ve MEB sunucusunun durumuna göre **15–25 dakika** sürer.
+Tam bir tarama genellikle **2 dakikadan kısa** sürer (ölçüldü: 10 il ~7 saniyede) — açılacak bir tarayıcı yok, il başına sadece iki hafif HTTP isteği var.
 
 ## Sadece Veri Setini Kullanmak
 
@@ -138,13 +135,15 @@ console.log(schools.ozet);
 ## Nasıl Çalışıyor?
 
 1. **İlleri dolaş.** `cities.json` 81 il için resmi `ILKODU=1…81` değerlerini sağlar.
-2. **İl sayfasını aç.** Puppeteer, masaüstü user-agent ile `index.php?ILKODU=<n>` adresine gider; 50 sn timeout ve gerekirse 4 denemeye kadar yeniden bağlanır.
-3. **Bağlantıları çıkar.** Sayfa içindeki `<a>` etiketleri; aksan sadeleştirme + Türkçe küçük harf normalizasyonu ile filtrelenir. Sadece şehir adını ve bir tire içeren bağlantılar tutulur.
-4. **Satırları ayrıştır.** MEB satırları `İL - İLÇE - OKUL ADI` biçiminde sunar. `-` üzerinden böler, son parçayı okul adı olarak alır, ilçeyi türetir.
+2. **Kayıt sayısını öğren.** İl sayfasındaki DataTables bileşeninin çağırdığı aynı `okullar_ajax.php` uç noktasına `il=<kod>`, `ilce=0` ("tüm ilçeler") ve `length=1` ile POST atılır — yanıttaki `recordsTotal` o ilin tam okul sayısını verir.
+3. **Her şeyi tek seferde çek.** `length`, `recordsTotal`'ın üzerinde bir değerle tekrar POST edilir; DataTables TÜM sonuç kümesini tek yanıtta döndürür (dolaşılacak bir sayfalama imleci yok). MEB yanıt vermezse 6 saniyelik beklemeyle en fazla 4 kez yeniden denenir.
+4. **Satırları ayrıştır.** MEB satırları `OKUL_ADI` alanında `İL - İLÇE - OKUL ADI` biçiminde sunar. ` - ` üzerinden böler, ikinci parçadan sonrasını okul adı olarak birleştirir (bazı gerçek okul adlarının kendi içinde ` - ` geçtiği görüldü, örn. *"Abdurrahman - Nermin Bilimli İlkokulu"*), ilçeyi türetir.
 5. **İlçeyi normalize et.** Yazım hatası sözlüğü uygulanır (`'DOĞUBEYAZIT' → 'DOĞUBAYAZIT'` gibi). Sonra, **yalnızca büyükşehir olmayan illerde**, il adıyla eşleşen ilçeler `MERKEZ` olarak kabul edilir — çünkü İstanbul ve Ankara gibi illerde "MERKEZ" diye bir ilçe yoktur.
 6. **Okul türünü sınıflandır.** Okul adının küçük harf hali üzerinde anahtar kelime kuralları çalıştırılır.
-7. **Sayfayı güvenli ilerlet.** Bir "sonraki sayfa" düğmesi bulunup tıklanır; ardından 25 deneme × 600 ms süreyle ilk satırın gerçekten değişmesi beklenir. Değişmezse bu il bitmiştir.
-8. **Toparla ve kaydet.** Her il bir anahtar olacak şekilde `schools.json` yazılır; sona toplam değerleri içeren bir `ozet` bloğu eklenir.
+7. **Checkpoint'le ve topla.** Her ilden sonra `schools.partial.json` yazılır; 81 il de bitince her il bir anahtar olacak şekilde nihai `schools.json` yazılır (artı bir `ozet` bloğu), checkpoint dosyası silinir.
+8. **Toplamları sağlama al.** `ozet`, beklenen il/ilçe/okul sayılarıyla karşılaştırılır; MEB'in site yapısı yine değiştiyse yüksek sesle uyarı verilir.
+
+> Neden doğrudan `index.php?ILKODU=<n>` adresine gidip bir tarayıcı gibi davranmıyoruz? Çünkü MEB'in sayfası, taze bir sayfa yüklemesinde aynı AJAX çağrısını `ilce=1`e (sadece 1 numaralı ilçe) sabitliyor — "tüm ilçeleri göster" sıfırlaması SADECE il dropdown'ındaki bir istemci-taraflı `change` olayından tetikleniyor, ki doğrudan URL ziyareti bunu asla tetiklemiyor. Uç noktayı kendimiz `ilce=0` ile çağırmak bunu tamamen atlatıyor.
 
 ## Proje Yapısı
 
@@ -153,6 +152,7 @@ console.log(schools.ozet);
 ├── script.js          # Kazıyıcı
 ├── cities.json        # 81 il ve MEB ILKODU değerleri
 ├── schools.json       # Üretilen veri seti (depoda hazır)
+├── schools.partial.json  # Her ilden sonra yazılan checkpoint, başarıda silinir
 ├── package.json
 ├── LICENSE
 ├── README.md          # İngilizce
@@ -169,7 +169,7 @@ console.log(schools.ozet);
 
 ## Etik ve Sorumluluk
 
-Bu kazıyıcı; eğitim, araştırma ve açık veri amaçları için tasarlanmıştır. Kaynak veri MEB tarafından kamuya açık bir sitede yayımlanmaktadır. Script kendi kendini frenler (sayfa etkileşimleri arasında ~600 ms, iller arasında 1 sn bekleme), timeout'lara saygı gösterir ve düzgün şekilde yeniden dener. Lütfen projeyi fork ederseniz bu korumaları kaldırmayın. Veriyi yeniden yayımlarken kaynak olarak MEB'i belirtin.
+Bu kazıyıcı; eğitim, araştırma ve açık veri amaçları için tasarlanmıştır. Kaynak veri MEB tarafından kamuya açık bir sitede yayımlanmaktadır. Script il başına tam olarak iki hafif istek yapar, iller arasında kendini frenler, timeout'lara saygı gösterir ve düzgün şekilde yeniden dener. Lütfen projeyi fork ederseniz bu korumaları kaldırmayın. Veriyi yeniden yayımlarken kaynak olarak MEB'i belirtin.
 
 ## Katkı
 

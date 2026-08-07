@@ -2,10 +2,10 @@
 
 # MEB Tam Okul Listesi — Scraper & Open Dataset
 
-**A Puppeteer-powered scraper that produces a complete, normalized JSON dataset of every K-12 school in Türkiye, sourced directly from the Ministry of National Education (MEB).**
+**A lightweight, browser-free scraper that produces a complete, normalized JSON dataset of every K-12 school in Türkiye, sourced directly from the Ministry of National Education (MEB).**
 
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Puppeteer](https://img.shields.io/badge/Puppeteer-24.x-40B5A4?logo=puppeteer&logoColor=white)](https://pptr.dev/)
+[![Zero dependencies](https://img.shields.io/badge/dependencies-0-40B5A4)](./package.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Schools](https://img.shields.io/badge/Schools-54%2C923-blue)](#-dataset-at-a-glance)
 [![Provinces](https://img.shields.io/badge/Provinces-81%2F81-success)](#-dataset-at-a-glance)
@@ -20,11 +20,13 @@
 
 ## Overview
 
-This project crawls the official MEB school directory at `meb.gov.tr/baglantilar/okullar` and turns its paginated, inconsistently-formatted HTML into a single, machine-readable JSON file. Every record carries the school name, normalized district, classified school type, and direct URL.
+This project queries the official MEB school directory at `meb.gov.tr/baglantilar/okullar` and turns its data into a single, machine-readable JSON file. Every record carries the school name, normalized district, classified school type, and direct URL.
 
-The scraper is built to survive the realities of the source site: silent pagination, name collisions between cities and districts, dozens of misspellings of district names (`DOĞUBEYAZIT` vs. `DOĞUBAYAZIT`, `ÇELTİKCİ` vs. `ÇELTİKÇİ`, …), and the Turkish-language `Elâzığ` vs. `Elazığ` accent variant that quietly breaks naive string matching. After normalization, the output exactly matches the official count of **81 provinces and 973 districts**.
+The scraper is built to survive the realities of the source site: name collisions between cities and districts, dozens of misspellings of district names (`DOĞUBEYAZIT` vs. `DOĞUBAYAZIT`, `ÇELTİKCİ` vs. `ÇELTİKÇİ`, …), and the Turkish-language `Elâzığ` vs. `Elazığ` accent variant that quietly breaks naive string matching. After normalization, the output exactly matches the official count of **81 provinces and 973 districts**.
 
 If you do not need to run the scraper, the latest `schools.json` is committed to the repo and can be consumed as a static dataset.
+
+> **Aug 2026 note:** MEB migrated the province page from a plain paginated HTML list to a server-side [DataTables](https://datatables.net/) table backed by `okullar_ajax.php`. Loading a province page directly (as any URL-based crawler does) now defaults that endpoint to district code `1` only — a client-side script fixes this by resetting the filter to "all districts" *after* the page loads, so a plain URL visit silently under-collects unless you drive that UI interaction. v2.1.0 fixes this by calling the same AJAX endpoint directly with the "all districts" parameter instead of scripting a browser; see [How It Works](#how-it-works).
 
 ## Dataset at a Glance
 
@@ -39,13 +41,13 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 
 ## Features
 
-- **Full-country coverage.** Iterates all 81 provinces from `cities.json` and walks every pagination cursor until exhausted.
+- **Full-country coverage.** Iterates all 81 provinces from `cities.json` and fetches every district (`ilce=0` = "all") in a single request per province — no pagination loop needed.
+- **Zero dependencies, no browser.** Talks to MEB's own `okullar_ajax.php` endpoint with Node's built-in `fetch`. No Puppeteer, no Chromium download, no headless browser to keep up to date.
 - **District normalization.** A curated typo map plus rules for metropolitan municipalities (`büyükşehir`) collapses MEB's inconsistent spellings into a single canonical district name, so duplicates do not appear in the dataset.
 - **School-type classifier.** A keyword classifier maps each school name to one of the standard MEB categories — İlkokul, Ortaokul, Anadolu Lisesi, Fen Lisesi, Anadolu İmam Hatip Lisesi, Mesleki ve Teknik Anadolu Lisesi, BİLSEM, Halk Eğitimi Merkezi, Öğretmenevi, and more.
-- **Robust pagination.** Detects "next page" controls by text (`>`, `»`, `Sonraki`, page number) and verifies the page actually changed before advancing — this prevents infinite loops when MEB silently re-serves the same page.
-- **Retry with backoff.** Up to four attempts per province with a 6-second wait between failures; a 1-second cool-down between provinces to avoid hammering the source.
-- **Accent-aware matching.** Strips `â/î/û` and applies Turkish-locale lowercasing so cities like `Elâzığ` are matched correctly during DOM filtering.
-- **Self-reporting summary.** The script appends an `ozet` (summary) key to the output with totals for provinces, districts, and schools.
+- **Retry with backoff.** Up to four attempts per province with a 6-second wait between failures; a cool-down between provinces to avoid hammering the source.
+- **Checkpointing.** Writes `schools.partial.json` after every province, so a crash or network drop mid-run doesn't lose already-collected provinces.
+- **Self-verifying output.** Compares the final `ozet` totals against the expected province/district/school counts and prints a warning if they deviate by more than 15% — the exact kind of silent under-collection that motivated the Aug 2026 fix now gets caught automatically instead of shipping unnoticed.
 
 ## Output Schema
 
@@ -86,24 +88,19 @@ If you do not need to run the scraper, the latest `schools.json` is committed to
 
 ### Prerequisites
 
-- Node.js **18 or newer**
-- ~250 MB free disk (Chromium download for Puppeteer)
+- Node.js **18 or newer** (for the built-in `fetch`)
 - A stable internet connection
+- No disk space beyond the ~9 MB output — there are no dependencies to install
 
 ### Install & run
 
 ```bash
 git clone https://github.com/nino0435/meb-okul-listesi-scraper-script-master.git
 cd meb-okul-listesi-scraper-script-master
-npm install
 node script.js
 ```
 
-On Apple Silicon (M1/M2/M3) Macs, if Puppeteer fails to download a compatible Chromium build, force the latest version:
-
-```bash
-npm install puppeteer@latest
-```
+(`npm install` is a no-op — the project has zero runtime dependencies — but it's still safe to run if you prefer.)
 
 While running, the script logs progress per province:
 
@@ -117,7 +114,7 @@ While running, the script logs progress per province:
     Toplam Okul: 54923
 ```
 
-A full run takes roughly **15–25 minutes** depending on your connection and MEB's response time.
+A full run typically finishes in **under 2 minutes** (measured: 10 provinces in ~7 seconds) — no browser to launch, just two lightweight HTTP requests per province.
 
 ## Using the Dataset Without Running the Scraper
 
@@ -138,13 +135,15 @@ console.log(schools.ozet);
 ## How It Works
 
 1. **Iterate provinces.** `cities.json` provides the 81 official province codes (`ILKODU=1…81`).
-2. **Open the province page.** Puppeteer navigates to `index.php?ILKODU=<n>` with a desktop user-agent and a 50s load timeout, retrying up to four times if MEB stalls.
-3. **Extract candidate links.** Anchor tags are filtered in the page context using accent-stripped, Turkish-locale lowercased matching — only links whose visible text contains the city name and a hyphen are kept.
-4. **Parse each row.** MEB serves rows shaped like `İL - İLÇE - OKUL ADI`; the script splits on `-`, keeps the school name (last segment), and derives a raw district.
+2. **Probe the record count.** POST to MEB's own `okullar_ajax.php` (the same endpoint the province page's DataTables widget calls) with `il=<code>`, `ilce=0` ("all districts"), `length=1` — the response's `recordsTotal` tells us exactly how many schools that province has.
+3. **Fetch everything in one shot.** POST again with `length` set above `recordsTotal`; DataTables returns the full result set in a single response (no pagination cursor to walk), retrying up to four times with a 6-second backoff if MEB stalls.
+4. **Parse each row.** MEB serves rows shaped like `İL - İLÇE - OKUL ADI` in the `OKUL_ADI` field; the script splits on ` - `, keeps everything after the second segment as the school name (a few dozen real school names contain their own ` - `, e.g. *"Abdurrahman - Nermin Bilimli İlkokulu"*), and derives a raw district.
 5. **Normalize the district.** Apply the typo map (`'DOĞUBEYAZIT' → 'DOĞUBAYAZIT'`, etc.), then collapse names that equal the province itself to `MERKEZ` — **but only for non-metropolitan provinces**, since cities like İstanbul and Ankara have no `MERKEZ`.
 6. **Classify the school type.** Run keyword rules against the lowercased name to pick the right MEB category.
-7. **Advance pagination safely.** Find a clickable next-page control, then poll the DOM up to 25 times (600 ms each) waiting for the first row to change. If it never changes, the province is done.
-8. **Aggregate and persist.** Write `schools.json` with each province as a key, plus an `ozet` summary block.
+7. **Checkpoint and aggregate.** Write `schools.partial.json` after every province; once all 81 finish, write the final `schools.json` with each province as a key plus an `ozet` summary block, and delete the checkpoint file.
+8. **Sanity-check the totals.** Compare `ozet` against the expected province/district/school counts and warn loudly if MEB's site structure has changed again.
+
+> Why not just visit `index.php?ILKODU=<n>` directly, like a browser would? Because MEB's page defaults that same AJAX call to `ilce=1` (district code 1 only) on a fresh page load — the "show all districts" reset only fires from a client-side `change` event on the province dropdown, which a direct URL visit never triggers. Calling the AJAX endpoint with `ilce=0` ourselves sidesteps that entirely.
 
 ## Project Structure
 
@@ -153,6 +152,7 @@ console.log(schools.ozet);
 ├── script.js          # The scraper
 ├── cities.json        # 81 provinces with their MEB ILKODU values
 ├── schools.json       # Generated dataset (committed for convenience)
+├── schools.partial.json  # Checkpoint written after each province, deleted on success
 ├── package.json
 ├── LICENSE
 ├── README.md          # English (this file)
@@ -169,7 +169,7 @@ console.log(schools.ozet);
 
 ## Disclaimer & Ethics
 
-This scraper is intended for educational, research, and open-data purposes. The underlying data is published by MEB on a public website. The script throttles itself (≈600 ms between page interactions and a 1-second cool-down between provinces), respects timeouts, and retries gracefully — please keep these protections in place if you fork it. If you redistribute the dataset, attribute MEB as the original source.
+This scraper is intended for educational, research, and open-data purposes. The underlying data is published by MEB on a public website. The script makes exactly two lightweight requests per province, throttles itself with a cool-down between provinces, respects timeouts, and retries gracefully — please keep these protections in place if you fork it. If you redistribute the dataset, attribute MEB as the original source.
 
 ## Contributing
 

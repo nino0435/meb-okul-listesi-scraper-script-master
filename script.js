@@ -1,6 +1,17 @@
-const puppeteer = require('puppeteer')
 const cities = require('./cities.json')
 const fs = require('fs')
+
+const AJAX_URL = 'https://www.meb.gov.tr/baglantilar/okullar/okullar_ajax.php'
+const CHECKPOINT_FILE = './schools.partial.json'
+const OUTPUT_FILE = './schools.json'
+
+// Önceki sürümde (v2.0, Puppeteer + link-metni ayrıştırma) beklenen referans
+// büyüklükler. Kesin doğrulama değil — MEB verisi zamanla organik olarak
+// değişir (okul açılış/kapanışı) — ama %kayda-değer sapmalarda uyarı verir.
+const BEKLENEN_IL = 81
+const BEKLENEN_ILCE_YAKLASIK = 973
+const BEKLENEN_OKUL_YAKLASIK = 54923
+const SAPMA_TOLERANSI = 0.15 // %15'ten fazla sapma → uyarı
 
 const data = {}
 const uniqueDistricts = new Set()
@@ -8,7 +19,7 @@ const uniqueDistricts = new Set()
 // Okul ismine bakarak okul türünü tespit eden akıllı fonksiyon
 const detectSchoolType = (schoolName) => {
   const name = schoolName.toLowerCase('tr-TR')
-  
+
   if (name.includes('ilkokulu')) return 'İlkokul'
   if (name.includes('ortaokulu')) return 'Ortaokul'
   if (name.includes('fen lisesi')) return 'Fen Lisesi'
@@ -23,16 +34,16 @@ const detectSchoolType = (schoolName) => {
   if (name.includes('spor lisesi')) return 'Spor Lisesi'
   if (name.includes('güzel sanatlar lisesi')) return 'Güzel Sanatlar Lisesi'
   if (name.includes('lisesi')) return 'Lise'
-  
+
   return 'Diğer / Özel Eğitim'
 }
 
 // MEB sitesindeki tüm harf hatalarını ve mükerrer yazımları RESMİ İLÇE STANDARTINA çeken fonksiyon
 const normalizeDistrict = (dist, cityName) => {
   if (!dist) return 'MERKEZ';
-  
+
   let cleaned = dist.toUpperCase('tr-TR').trim();
-  
+
   const typos = {
     'DOĞUBEYAZIT': 'DOĞUBAYAZIT', 'TASOVA': 'TAŞOVA', 'İBRADI': 'İBRADİ', 'INCİRLİOVA': 'İNCİRLİOVA',
     'CAVDIR': 'ÇAVDIR', 'ÇELTİKCİ': 'ÇELTİKÇİ', 'YENİSEHİR': 'YENİŞEHİR', 'MUSTAFAKEMALPASA': 'MUSTAFAKEMALPAŞA',
@@ -42,204 +53,147 @@ const normalizeDistrict = (dist, cityName) => {
     'BAGCILAR': 'BAĞCILAR', 'BAHCELİEVLER': 'BAHÇELİEVLER', 'KADİKÖY': 'KADIKÖY', 'KÜÇÜKCEKMECE': 'KÜÇÜKÇEKMECE',
     'GAZİOSMANPASA': 'GAZİOSMANPAŞA', 'MARMARA EREĞLİSİ': 'MARMARAEREĞLİSİ', 'MERKEZE BAĞLI TAŞRA': 'MERKEZ'
   };
-  
+
   if (typos[cleaned]) {
     cleaned = typos[cleaned];
   }
-  
+
   const buyuksehirler = [
-    'İSTANBUL', 'ANKARA', 'İZMİR', 'BURSA', 'ANTALYA', 'KONYA', 'ADANA', 'GAZİANTEP', 
-    'ŞANLIURFA', 'KOCAELİ', 'MERSİN', 'DİYARBAKIR', 'HATAY', 'MANİSA', 'BALIKESİR', 
-    'SAMSUN', 'VAN', 'AYDIN', 'DENİZLİ', 'TEKİRDAĞ', 'MUĞLA', 'KAYSERİ', 'ESKİŞEHİR', 
+    'İSTANBUL', 'ANKARA', 'İZMİR', 'BURSA', 'ANTALYA', 'KONYA', 'ADANA', 'GAZİANTEP',
+    'ŞANLIURFA', 'KOCAELİ', 'MERSİN', 'DİYARBAKIR', 'HATAY', 'MANİSA', 'BALIKESİR',
+    'SAMSUN', 'VAN', 'AYDIN', 'DENİZLİ', 'TEKİRDAĞ', 'MUĞLA', 'KAYSERİ', 'ESKİŞEHİR',
     'ERZURUM', 'KAHRAMANMARAŞ', 'MARDİN', 'SAKARYA', 'MALATYA', 'TRABZON', 'ORDU'
   ];
-  
+
   if (cleaned === cityName.toUpperCase('tr-TR') && !buyuksehirler.includes(cleaned)) {
     cleaned = 'MERKEZ';
   }
-  
+
   return cleaned;
 }
 
-// Verileri ayrıştıran ana fonksiyon
-const cleanData = function (schools, cityName, uniqueDistrictsSet = null) {
-  const data = []
-  
-  const buyuksehirler = [
-    'İSTANBUL', 'ANKARA', 'İZMİR', 'BURSA', 'ANTALYA', 'KONYA', 'ADANA', 'GAZİANTEP', 
-    'ŞANLIURFA', 'KOCAELİ', 'MERSİN', 'DİYARBAKIR', 'HATAY', 'MANİSA', 'BALIKESİR', 
-    'SAMSUN', 'VAN', 'AYDIN', 'DENİZLİ', 'TEKİRDAĞ', 'MUĞLA', 'KAYSERİ', 'ESKİŞEHİR', 
-    'ERZURUM', 'KAHRAMANMARAŞ', 'MARDİN', 'SAKARYA', 'MALATYA', 'TRABZON', 'ORDU'
-  ];
-  const cityUpper = cityName.toUpperCase('tr-TR');
+// MEB, 2026 ortasında okullar/index.php sayfasını tamamen sunucu-taraflı
+// (server-side) bir DataTables tablosuna geçirdi. Sayfa artık <a> etiketleriyle
+// dolu bir liste değil; tablo verisini `okullar_ajax.php`'ye yapılan bir POST
+// isteğiyle çekiyor. Kritik nokta: sayfa doğrudan `?ILKODU=X` ile açıldığında
+// (yani bizim eski Puppeteer akışımızdaki gibi), tablonun `data-ilce` özniteliği
+// sunucu tarafından "1" olarak sabitleniyor — yani SADECE o ilin 1 numaralı
+// (genelde merkez/ilk) ilçesi geliyor. "Tüm ilçeler" sadece kullanıcı arayüzdeki
+// il dropdown'ını DEĞİŞTİRİNCE `ilce=0` olarak sıfırlanıyor; URL ile doğrudan
+// gidildiğinde bu JS event hiç tetiklenmiyor. Eski script bunu fark etmiyordu —
+// sessizce ilk ilçeyle "tamamlandı" diyip devam ediyordu (81 il boyunca %60-80
+// veri kaybı, bkz. proje geçmişi/README notu).
+//
+// Çözüm: Puppeteer/DOM tamamen devre dışı — aynı `okullar_ajax.php` uç noktasına
+// `ilce=0` (tümü) parametresiyle DOĞRUDAN POST atıyoruz. Bonus: `OKUL_ADI` alanı
+// zaten "İL - İLÇE - OKUL ADI" formatında geliyor, link metni tahmin etmeye
+// gerek kalmıyor; ve DataTables `length` parametresi istenen sayıyı aşarsa bile
+// TÜM kayıtları tek istekte döndürüyor (doğrulandı: length=2000 → 1270/1270).
+const buildAjaxBody = (il, ilce, start, length) => {
+  const params = new URLSearchParams()
+  params.set('draw', '1')
+  for (let i = 0; i < 3; i++) {
+    params.set(`columns[${i}][data]`, 'OKUL_ADI')
+    params.set(`columns[${i}][searchable]`, 'true')
+    params.set(`columns[${i}][orderable]`, 'true')
+    params.set(`columns[${i}][search][value]`, '')
+    params.set(`columns[${i}][search][regex]`, 'false')
+  }
+  params.set('order[0][column]', '0')
+  params.set('order[0][dir]', 'asc')
+  params.set('start', String(start))
+  params.set('length', String(length))
+  params.set('search[value]', '')
+  params.set('search[regex]', 'false')
+  params.set('il', String(il))
+  params.set('ilce', String(ilce))
+  return params.toString()
+}
 
-  for (const sch of schools) {
-    const words = sch.text.split('-')
-    if (words.length < 2) {
-      continue
-    }
-    
-    const schoolName = words[words.length - 1].trim()
-    
-    let rawDistrict = 'MERKEZ'
-    if (words.length >= 3) {
-      rawDistrict = words[1].trim()
-    } else if (words.length === 2) {
-      rawDistrict = words[0].trim()
-    }
-    
+const fetchAjax = async (il, ilce, start, length) => {
+  const res = await fetch(AJAX_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Referer': `https://www.meb.gov.tr/baglantilar/okullar/index.php?ILKODU=${il}`,
+    },
+    body: buildAjaxBody(il, ilce, start, length),
+  })
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+// Bir il için TÜM okulları (ilce=0 → tümü) çeker. Önce recordsTotal'ı öğrenmek
+// için 1 kayıtlık bir "keşif" isteği, sonra tam kaydı tek seferde çeken bir
+// istek — sayfalama/tıklama döngüsüne hiç gerek yok.
+const fetchProvinceSchools = async (cityNo, cityName) => {
+  const probe = await fetchAjax(cityNo, 0, 0, 1)
+  const total = probe.recordsTotal || 0
+  if (total === 0) return []
+
+  const full = await fetchAjax(cityNo, 0, 0, total + 10)
+  const rows = full.data || []
+
+  const result = []
+  for (const row of rows) {
+    const parts = String(row.OKUL_ADI || '').split(' - ')
+    if (parts.length < 3) continue // beklenmeyen format — atla (sessizce veri uydurma)
+
+    const rawDistrict = parts[1].trim()
+    const schoolName = parts.slice(2).join(' - ').trim()
     const districtName = normalizeDistrict(rawDistrict, cityName)
-    
-    if (uniqueDistrictsSet) {
-      if (districtName !== 'BÜYÜKŞEHİR' && !(buyuksehirler.includes(cityUpper) && districtName === 'MERKEZ')) {
-        uniqueDistrictsSet.add(`${cityUpper}-${districtName}`)
-      }
-    }
 
-    data.push({
+    uniqueDistricts.add(`${cityName.toUpperCase('tr-TR')}-${districtName}`)
+
+    result.push({
       name: schoolName,
       district: districtName,
       type: detectSchoolType(schoolName),
-      url: sch.url
+      url: row.HOST ? `https://${row.HOST}.meb.k12.tr/` : null,
     })
   }
-  return data
+  return result
+}
+
+// Checkpoint: her ilden sonra ARA KAYIT alır. Eski sürümde tek writeFileSync
+// en sondaydı — 81 ilin ortasında çökme/kesinti olursa TÜM ilerleme kaybolurdu.
+const saveCheckpoint = () => {
+  fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(data, null, 2), 'utf-8')
 }
 
 const fetchSchools = async () => {
-  const browser = await puppeteer.launch({ headless: true })
-  const page = await browser.newPage()
-
-  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-
   for (const city of cities) {
-    let pageNum = 1
-    let hasNextPage = true
-    let allCitySchools = []
-    let previousPageFirstSchoolName = null
-
     console.log(`=> ${city.name} için okullar çekiliyor...`)
 
-    // Geliştirilmiş Yeniden Deneme (Retry) Döngüsü
-    let entryAttempts = 0
-    let entrySuccess = false
-    while (entryAttempts < 4 && !entrySuccess) {
+    let attempts = 0
+    let success = false
+    let schools = []
+    while (attempts < 4 && !success) {
       try {
-        await page.goto(`https://www.meb.gov.tr/baglantilar/okullar/index.php?ILKODU=${city.no}`, { waitUntil: 'load', timeout: 50000 })
-        entrySuccess = true
+        schools = await fetchProvinceSchools(city.no, city.name)
+        success = true
       } catch (e) {
-        entryAttempts++
-        console.log(`   [!] Bağlantı hatası veya yavaşlık algılandı. 6 saniye sonra tekrar deneniyor (${entryAttempts}/4)...`)
-        await new Promise(r => setTimeout(r, 6000))
+        attempts++
+        console.log(`   [!] Hata: ${e.message}. 6 saniye sonra tekrar deneniyor (${attempts}/4)...`)
+        await new Promise((r) => setTimeout(r, 6000))
       }
     }
 
-    if (!entrySuccess) {
-      console.log(`   [❌] İl sayfasına hiçbir şekilde bağlanılamadı, bu il atlanıyor.`);
-      continue;
+    if (!success) {
+      console.log(`   [❌] ${city.name} hiçbir şekilde çekilemedi, bu il atlanıyor.`)
+      continue
     }
 
-    while (hasNextPage) {
-      let items = []
-      try {
-        items = await page.evaluate((currentCityName) => {
-          const links = Array.from(document.getElementsByTagName('a'));
-          
-          const normalize = (str) => {
-            if (!str) return '';
-            return str.toLocaleLowerCase('tr-TR')
-                      .replace(/â/g, 'a')
-                      .replace(/î/g, 'i')
-                      .replace(/û/g, 'u')
-                      .trim();
-          };
+    const key = city.name.toLocaleLowerCase('tr-TR')
+    data[key] = schools
+    console.log(`   [✓] ${city.name} tamamlandı. Toplam okul: ${schools.length}`)
 
-          const searchName = normalize(currentCityName);
-          
-          return links
-            .filter(i => {
-              if (!i.text) return false;
-              const linkText = normalize(i.text);
-              return linkText.includes(searchName) && linkText.includes('-');
-            })
-            .map(i => ({ text: i.text.trim(), url: i.href }));
-        }, city.name)
-      } catch (err) {}
-
-      const schools = cleanData(items, city.name, uniqueDistricts)
-
-      if (schools.length === 0) {
-        break
-      }
-
-      if (previousPageFirstSchoolName === schools[0].name) {
-        break
-      }
-      previousPageFirstSchoolName = schools[0].name
-
-      allCitySchools = allCitySchools.concat(schools)
-
-      const clickSuccess = await page.evaluate((nextPageNum) => {
-        const elements = Array.from(document.querySelectorAll('a, button, span, li'));
-        const targetStr = nextPageNum.toString();
-        
-        let btn = elements.find(el => el.textContent.trim() === targetStr);
-        
-        if (!btn) {
-          btn = elements.find(el => {
-            const t = el.textContent.trim();
-            return t === '>' || t === '»' || t.toLowerCase().includes('sonraki');
-          });
-        }
-        
-        if (btn) {
-          btn.click();
-          return true;
-        }
-        return false;
-      }, pageNum + 1)
-
-      if (!clickSuccess) {
-        hasNextPage = false
-      } else {
-        let pageChanged = false
-        for (let attempts = 0; attempts < 25; attempts++) {
-          await new Promise(r => setTimeout(r, 600)) // Sayfa yükünü hafifletmek için bekleme süresi artırıldı
-          try {
-            const newItems = await page.evaluate((currentCityName) => {
-              const links = Array.from(document.getElementsByTagName('a'));
-              const normalize = (str) => {
-                if (!str) return '';
-                return str.toLocaleLowerCase('tr-TR').replace(/â/g, 'a').trim();
-              };
-              const searchName = normalize(currentCityName);
-              return links
-                .filter(i => i.text && normalize(i.text).includes(searchName) && i.text.includes('-'))
-                .map(i => ({ text: i.text.trim(), url: i.href }));
-            }, city.name)
-            const newSchools = cleanData(newItems, city.name)
-            
-            if (newSchools.length > 0 && newSchools[0].name !== previousPageFirstSchoolName) {
-              pageChanged = true
-              break
-            }
-          } catch (err) {}
-        }
-
-        if (!pageChanged) {
-          hasNextPage = false
-        } else {
-          pageNum++
-        }
-      }
-    }
-
-    const key = `${city.name}`.toLocaleLowerCase('tr-TR')
-    data[key] = allCitySchools
-    console.log(`   [✓] ${city.name} tamamlandı. Toplam okul: ${allCitySchools.length}`)
-    
-    // MEB güvenlik duvarını dinlendirmek için iller arasına 1 saniyelik statik mola eklendi
-    await new Promise(r => setTimeout(r, 1000))
+    saveCheckpoint()
+    await new Promise((r) => setTimeout(r, 500))
   }
 
   let totalSchools = 0
@@ -252,15 +206,30 @@ const fetchSchools = async () => {
   data['ozet'] = {
     toplam_il: totalProvinces,
     toplam_ilce: uniqueDistricts.size,
-    toplam_okul: totalSchools
+    toplam_okul: totalSchools,
   }
 
-  fs.writeFileSync('./schools.json', JSON.stringify(data, null, 2), 'utf-8')
-  await browser.close()
-  console.log(`\n[🎉] BAŞARIYLA TAMAMLANDI!`);
-  console.log(`    Toplam İl: ${totalProvinces}`);
-  console.log(`    Toplam İlçe: ${uniqueDistricts.size} (Resmi Sayıya Tam Eşitlendi!)`);
-  console.log(`    Toplam Okul: ${totalSchools}`);
+  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(data, null, 2), 'utf-8')
+  if (fs.existsSync(CHECKPOINT_FILE)) fs.unlinkSync(CHECKPOINT_FILE)
+
+  console.log(`\n[🎉] BAŞARIYLA TAMAMLANDI!`)
+  console.log(`    Toplam İl: ${totalProvinces}`)
+  console.log(`    Toplam İlçe: ${uniqueDistricts.size}`)
+  console.log(`    Toplam Okul: ${totalSchools}`)
+
+  // Kendi kendini doğrulama: eski sürümde bu kontrol YOKTU — script "başarıyla
+  // tamamlandı" derdi ama veri sessizce %70 eksik olabilirdi (bkz. yukarıdaki
+  // data-ilce regresyonu). Beklenen büyüklüklerden ciddi sapma varsa uyar.
+  const sapma = (deger, beklenen) => Math.abs(deger - beklenen) / beklenen
+  if (totalProvinces !== BEKLENEN_IL) {
+    console.warn(`[⚠️] UYARI: beklenen ${BEKLENEN_IL} il, bulunan ${totalProvinces}.`)
+  }
+  if (sapma(uniqueDistricts.size, BEKLENEN_ILCE_YAKLASIK) > SAPMA_TOLERANSI) {
+    console.warn(`[⚠️] UYARI: ilçe sayısı beklenenden çok sapıyor (yaklaşık ${BEKLENEN_ILCE_YAKLASIK} bekleniyordu, ${uniqueDistricts.size} bulundu). Ayrıştırma/format değişmiş olabilir.`)
+  }
+  if (sapma(totalSchools, BEKLENEN_OKUL_YAKLASIK) > SAPMA_TOLERANSI) {
+    console.warn(`[⚠️] UYARI: okul sayısı beklenenden çok sapıyor (yaklaşık ${BEKLENEN_OKUL_YAKLASIK} bekleniyordu, ${totalSchools} bulundu). MEB'in sayfa/API yapısı yine değişmiş olabilir — çıktıyı commit'lemeden önce örnek illeri elle kontrol et.`)
+  }
 }
 
 fetchSchools()

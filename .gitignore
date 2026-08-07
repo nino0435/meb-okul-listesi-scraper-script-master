@@ -24,14 +24,14 @@ Thumbs.db
 *.swp
 *.swo
 
-# Puppeteer cache (when not using bundled chromium)
-.cache/
-.puppeteer-cache/
-
 # Build / temporary
 dist/
 tmp/
 *.tmp
+
+# Scraper checkpoint (written mid-run, deleted automatically on success —
+# only lingers here if a run was killed/crashed before finishing)
+schools.partial.json
 
 # Local-only output (uncomment the next line if you do NOT want to commit the dataset)
 # schools.json

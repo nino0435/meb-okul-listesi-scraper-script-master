@@ -39,7 +39,7 @@ Thanks for taking the time to improve this project. The scraper covers the entir
 ### What to avoid
 
 - Removing the delays, retries, or per-province cool-down. They exist to be a good citizen against the MEB site.
-- Adding dependencies for things `puppeteer` + Node's built-ins can already do.
+- Adding dependencies for things Node's built-ins (`fetch`, etc.) can already do — the project intentionally has zero runtime dependencies.
 - Committing personal API keys, `.env` files, or large unrelated binaries.
 
 ### Reporting bugs
@@ -47,7 +47,7 @@ Thanks for taking the time to improve this project. The scraper covers the entir
 Open an issue and include:
 
 - Node version (`node -v`)
-- OS (and chip — Apple Silicon vs. Intel matters for Puppeteer)
+- OS
 - The exact error or unexpected output
 - The province where it occurred, if applicable
 
@@ -88,7 +88,7 @@ Bu projeyi geliştirmek için zaman ayırdığınız için teşekkürler. Scrape
 ### Kaçınılması gerekenler
 
 - Bekleme süreleri, yeniden deneme döngüsü veya iller arası mola kaldırılmamalı. Bunlar MEB sitesine saygılı davranmak için var.
-- `puppeteer` ve Node yerleşikleriyle yapılabilecek şeyler için yeni bağımlılık eklemeyin.
+- Node yerleşikleriyle (`fetch` vb.) yapılabilecek şeyler için yeni bağımlılık eklemeyin — proje bilinçli olarak sıfır çalışma zamanı bağımlılığına sahip.
 - Kişisel API anahtarları, `.env` dosyaları veya ilgisiz büyük ikili dosyalar commit etmeyin.
 
 ### Hata bildirimi
@@ -96,6 +96,6 @@ Bu projeyi geliştirmek için zaman ayırdığınız için teşekkürler. Scrape
 Issue açarken şunları paylaşın:
 
 - Node sürümü (`node -v`)
-- İşletim sistemi (ve işlemci — Apple Silicon mı, Intel mi; Puppeteer için fark eder)
+- İşletim sistemi
 - Aldığınız tam hata mesajı veya beklenmedik çıktı
 - Mümkünse, hatanın oluştuğu il
